@@ -1,0 +1,13 @@
+resolver: nightly-2017-01-30
+
+packages:
+- '.'
+
+extra-deps: []
+
+flags: {}
+
+extra-package-dbs: []
+
+nix:
+  enable: true
