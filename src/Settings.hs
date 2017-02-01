@@ -1,4 +1,17 @@
-module Settings where
+{-# LANGUAGE TemplateHaskell #-}
+module Settings
+  ( Settings(..)
+  , defaultSettings
+  , coresize
+  ) where
 
-coresize :: Int
-coresize = 8
+import           Control.Lens
+
+data Settings = Settings
+  { _coresize :: Int
+  } deriving (Show, Eq)
+
+makeLenses ''Settings
+
+defaultSettings :: Settings
+defaultSettings = Settings {_coresize = 8}

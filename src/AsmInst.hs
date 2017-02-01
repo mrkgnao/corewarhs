@@ -1,5 +1,3 @@
-{-# LANGUAGE GADTs           #-}
-{-# LANGUAGE KindSignatures  #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
 module AsmInst where
@@ -10,8 +8,8 @@ import           Data.Maybe   (fromJust)
 type Value = Int
 
 data Field
-  = A
-  | B
+  = FieldA
+  | FieldB
   deriving (Show, Eq)
 
 data PointerChange
@@ -27,17 +25,36 @@ data AddressMode
              PointerChange
   deriving (Show, Eq)
 
+data Modifier
+  = ModA
+  | ModB
+  | ModAB
+  | ModBA
+  | ModF
+  | ModX
+  | ModI
+  deriving (Eq)
+
+instance Show Modifier where
+  show ModA  = "A "
+  show ModB  = "B "
+  show ModAB = "AB"
+  show ModBA = "BA"
+  show ModF  = "F "
+  show ModX  = "X "
+  show ModI  = "I "
+
 toSymbol Immediate = "#"
 toSymbol Direct = " " -- "$" is optional
 toSymbol (Indirect f p) = fromJust $ lookup (f, p) pairs
   where
     pairs =
-      [ ((A, None), "*")
-      , ((B, None), "@")
-      , ((A, PreDec), "{")
-      , ((B, PreDec), "<")
-      , ((A, PostInc), "}")
-      , ((B, PostInc), ">")
+      [ ((FieldA, None), "*")
+      , ((FieldB, None), "@")
+      , ((FieldA, PreDec), "{")
+      , ((FieldB, PreDec), "<")
+      , ((FieldA, PostInc), "}")
+      , ((FieldB, PostInc), ">")
       ]
 
 data Operand = Operand
@@ -49,33 +66,32 @@ instance Show Operand where
   show (Operand m v) = toSymbol m ++ (show v)
 
 data AsmInst = AsmInst
-  { _opcode :: Opcode
-  , _a      :: Operand
-  , _b      :: Operand
+  { _opcode   :: Opcode
+  , _modifier :: Modifier
+  , _a        :: Operand
+  , _b        :: Operand
   } deriving (Eq)
 
 instance Show AsmInst where
-  show AsmInst{..} = concat [show _opcode, " ", show _a, ", ", show _b]
+  show AsmInst {..} =
+    concat [show _opcode, ".", show _modifier, " ", show _a, ", ", show _b]
 
 dat00 :: AsmInst
-dat00 = mkInstruction DAT (Direct, 0) (Direct, 0)
+dat00 = mkInstruction DAT ModF (Direct, 0) (Direct, 0)
 
 defaultInst :: AsmInst
 defaultInst = dat00
 
-mkInstruction :: Opcode -> (AddressMode, Value) -> (AddressMode, Value) -> AsmInst
-mkInstruction opcode (amode, aval) (bmode, bval) = AsmInst opcode afield bfield
+mkInstruction :: Opcode
+              -> Modifier
+              -> (AddressMode, Value)
+              -> (AddressMode, Value)
+              -> AsmInst
+mkInstruction opcode mod (amode, aval) (bmode, bval) =
+  AsmInst opcode mod afield bfield
   where
     afield = Operand {_mode = amode, _value = aval}
     bfield = Operand {_mode = bmode, _value = bval}
-
-mkModedInstruction :: Opcode -> ModePair -> Value -> Value -> AsmInst
-mkModedInstruction opcode (am, bm) av bv =
-  mkInstruction opcode (am, av) (bm, bv)
-
-type ModePair = (AddressMode,AddressMode)
-
-bothDirect = (Direct, Direct)
 
 data Opcode
   = DAT -- ^ "Data".
@@ -116,7 +132,13 @@ data Opcode
         -- ^ Saves a number to private storage space.
   | NOP -- ^ "No operation".
         -- ^ Does nothing.
-  deriving (Show, Eq)
+  deriving (Show, Read, Eq, Enum)
 
 makeLenses ''Operand
 makeLenses ''AsmInst
+
+aval :: Lens' AsmInst Value
+aval = a . value
+
+bval :: Lens' AsmInst Value
+bval = b . value
